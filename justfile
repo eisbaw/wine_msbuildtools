@@ -321,6 +321,12 @@ install-minimal:
         echo "Checking VC/Auxiliary/Build directory..."
         ls -la "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Auxiliary/Build" 2>/dev/null || echo "No Build directory found"
         echo ""
+        echo "Checking VC/Auxiliary/VS directory (minimal install may use this)..."
+        ls -laR "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Auxiliary/VS" 2>/dev/null || echo "No VS directory found"
+        echo ""
+        echo "Searching entire VC tree for .bat files..."
+        find "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC" -name "*.bat" 2>/dev/null || echo "No .bat files found"
+        echo ""
         echo "Checking recent logs..."
         ls -ltr "{{wineprefix}}/drive_c/users/"*/Temp/dd_*.log 2>/dev/null | tail -5 || echo "No logs found"
         exit 1
