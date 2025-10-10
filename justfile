@@ -122,14 +122,15 @@ download-minimal:
         rm -rf "{{wineprefix}}/drive_c/vslayout"
     fi
 
-    # Download the offline layout - MINIMAL (no --includeRecommended/Optional)
-    echo "Downloading MINIMAL offline layout (core C++ tools only, smaller size)..."
+    # Download the offline layout - MINIMAL (--includeRecommended but not --includeOptional)
+    echo "Downloading MINIMAL offline layout (recommended tools, no optional components)..."
     unset SHELL
     # Reduce Wine debug noise (only show errors)
     WINEDEBUG="err+all" wine "{{vs_buildtools_exe}}" \
         --layout "{{layout_path}}" \
         --lang en-US \
         --add Microsoft.VisualStudio.Workload.VCTools \
+        --includeRecommended \
         --quiet
 
     # Wait for all Wine processes to complete
@@ -272,8 +273,8 @@ install-minimal:
         fi
     fi
 
-    # Install from offline layout - MINIMAL (no --includeRecommended/Optional)
-    echo "Installing MINIMAL Build Tools from offline layout (core C++ tools only)..."
+    # Install from offline layout - MINIMAL (--includeRecommended but not --includeOptional)
+    echo "Installing MINIMAL Build Tools from offline layout (recommended tools, no optional components)..."
 
     unset SHELL
     set +e  # Don't exit on error, we want to check exit code
@@ -282,7 +283,8 @@ install-minimal:
         --quiet \
         --norestart \
         --noweb \
-        --add Microsoft.VisualStudio.Workload.VCTools
+        --add Microsoft.VisualStudio.Workload.VCTools \
+        --includeRecommended
     installer_exit_code=$?
     set -e
 
