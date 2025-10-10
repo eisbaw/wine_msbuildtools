@@ -121,6 +121,6 @@ jobs:
         if: always()
         run: nix-shell --run "just status"
 
-      - name: Check logs on failure
+      - name: Dump full logs on failure
         if: failure()
-        run: nix-shell --run "just check-logs"
+        run: nix-shell --run "just dump-logs"

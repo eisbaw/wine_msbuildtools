@@ -123,6 +123,7 @@ install:
     # Install from offline layout
     echo "Installing Build Tools from offline layout..."
     unset SHELL
+    set +e  # Don't exit on error, we want to check exit code
     wine "{{wineprefix}}/drive_c/vslayout/vs_buildtools.exe" \
         --quiet \
         --norestart \
@@ -130,6 +131,8 @@ install:
         --add Microsoft.VisualStudio.Workload.VCTools \
         --includeRecommended \
         --includeOptional
+    installer_exit_code=$?
+    set -e
 
     # Wait for all Wine processes to complete (installer spawns background processes)
     echo "Waiting for installer to complete..."
@@ -137,6 +140,15 @@ install:
 
     # Give filesystem time to sync (especially important in CI)
     sleep 5
+
+    # Check installer exit code
+    echo "Installer exit code: $installer_exit_code"
+    if [ $installer_exit_code -ne 0 ]; then
+        echo "WARNING: Installer returned non-zero exit code: $installer_exit_code"
+        echo "Checking logs for errors..."
+        tail -100 "{{wineprefix}}/drive_c/users/"*/Temp/dd_setup_*.log 2>/dev/null | grep -i "error" || true
+        tail -100 "{{wineprefix}}/drive_c/users/"*/Temp/dd_installer_*.log 2>/dev/null | grep -i "error" || true
+    fi
 
     # Verify installation
     vcvarsall="{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Auxiliary/Build/vcvarsall.bat"
@@ -278,6 +290,21 @@ list-tools:
 check-logs:
     @echo "Recent installer logs:"
     @ls -ltr "{{wineprefix}}/drive_c/users/"*/Temp/dd_*.log 2>/dev/null | tail -10 || echo "No logs found"
+
+# Dump full installer logs (for debugging failures)
+dump-logs:
+    #!/usr/bin/env bash
+    echo "=== Bootstrapper Logs ==="
+    tail -100 "{{wineprefix}}/drive_c/users/"*/Temp/dd_bootstrapper_*.log 2>/dev/null || echo "No bootstrapper logs"
+    echo ""
+    echo "=== Installer Logs ==="
+    tail -100 "{{wineprefix}}/drive_c/users/"*/Temp/dd_installer_*.log 2>/dev/null || echo "No installer logs"
+    echo ""
+    echo "=== Setup Logs ==="
+    tail -200 "{{wineprefix}}/drive_c/users/"*/Temp/dd_setup_*.log 2>/dev/null || echo "No setup logs"
+    echo ""
+    echo "=== Setup Error Logs ==="
+    cat "{{wineprefix}}/drive_c/users/"*/Temp/dd_setup_*_errors.log 2>/dev/null || echo "No error logs"
 
 # Show Wine prefix information
 info:
