@@ -1,0 +1,11 @@
+# Wine prefix (runtime)
+.wine/
+
+# Runtime logs
+history.log
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
