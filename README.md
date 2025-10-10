@@ -1,57 +1,72 @@
 # Visual Studio Build Tools 2019 in Wine
 
-This directory contains an automated installer for Microsoft Visual Studio Build Tools 2019 running in Wine on NixOS/Linux.
+Automated installer for Microsoft Visual Studio Build Tools 2019 running in Wine on NixOS/Linux, with a convenient justfile interface.
 
 ## Quick Start
 
 ```bash
-# Make the script executable
-chmod +x install_buildtools.sh
+# Enter the nix shell
+nix-shell
 
-# Run the installation
-./install_buildtools.sh
+# Complete installation (30-60 minutes)
+just full-install
+
+# Or step-by-step:
+just prerequisites  # Install .NET Framework 4.8 (5-15 min)
+just download       # Download offline layout (~5GB, 10-30 min)
+just install        # Install Build Tools
+just demo           # Verify with test compilation
 ```
 
-The installation process takes approximately 30-60 minutes and requires:
+## Available Commands
+
+Run `just` to see all available commands:
+
+| Command | Description |
+|---------|-------------|
+| `just prerequisites` | Install .NET Framework 4.8 (required before download/install) |
+| `just download` | Download VS Build Tools offline layout (~5GB) |
+| `just install` | Install Build Tools from offline layout |
+| `just demo` | Compile and run test C program to verify installation |
+| `just status` | Show installation status and disk usage |
+| `just full-install` | Run all steps: prerequisites → download → install → demo |
+| `just compiler-info` | Show MSVC compiler version and help |
+| `just list-tools` | List all installed MSVC tools (cl.exe, link.exe, etc.) |
+| `just check-logs` | Show recent installer log files |
+| `just clean-wine` | Kill background Wine processes |
+| `just clean-all` | **WARNING:** Delete entire Wine prefix |
+| `just info` | Show Wine prefix information |
+| `just winecfg` | Open Wine configuration GUI |
+
+## Requirements
+
 - Internet connection for downloading ~5GB offline layout
 - Approximately 10GB of free disk space
-
-## Directory Structure
-
-```
-packages/
-├── shell.nix                      # Nix environment with Wine
-├── install_buildtools.sh          # Automated installation script
-├── visualstudio_buildtools/2019/
-│   ├── vs_buildtools.exe         # VS Build Tools bootstrapper
-│   └── confirm.bat               # Verification script
-└── .wine/                        # Wine prefix (created during install)
-    └── drive_c/
-        ├── vslayout/             # Offline installation layout (~5GB)
-        └── Program Files (x86)/
-            └── Microsoft Visual Studio/
-                └── 2019/BuildTools/  # Installed Build Tools
-```
+- 30-60 minutes for complete installation
 
 ## Installation Process
 
-### Prerequisites: .NET Framework 4.8
+### Prerequisites: .NET Framework 4.8 (Critical)
 
-**CRITICAL:** The VS Build Tools installer requires .NET Framework 4.8 to be installed in Wine before it will run. Without it, the installer will crash with a segmentation fault (exit code 139).
+**The VS Build Tools installer requires .NET Framework 4.8.** Without it, the installer will crash with a segmentation fault (exit code 139).
 
-Install via winetricks:
 ```bash
-nix-shell --run "winetricks -q dotnet48"
+just prerequisites
 ```
 
-This is automatically handled by the `install_buildtools.sh` script.
+This installs .NET Framework 4.8 via winetricks (takes 5-15 minutes).
 
 ### Stage 1: Download Offline Layout
 
-The installer downloads a complete offline installation layout containing all required packages:
+Downloads a complete offline installation layout (~5GB):
 
 ```bash
-wine visualstudio_buildtools/2019/vs_buildtools.exe \
+just download
+```
+
+This runs:
+```bash
+wine vs_buildtools.exe \
     --layout "C:\vslayout" \
     --lang en-US \
     --add Microsoft.VisualStudio.Workload.VCTools \
@@ -61,16 +76,20 @@ wine visualstudio_buildtools/2019/vs_buildtools.exe \
 ```
 
 **Key parameters:**
-- `--layout`: Creates offline installation source (must be <80 chars)
-- `--quiet`: Avoids WPF UI errors in Wine
-- `--lang en-US`: English language only
-- `--add Microsoft.VisualStudio.Workload.VCTools`: C++ build tools
-- `--includeRecommended --includeOptional`: All components
+- `--layout C:\vslayout` - Short Windows path (<80 chars required)
+- `--quiet` - Skips UI (avoids WPF errors in Wine)
+- `--lang en-US` - English language only
+- `--add Microsoft.VisualStudio.Workload.VCTools` - C++ build tools workload
 
 ### Stage 2: Install from Layout
 
-The installer uses the offline layout to install Build Tools:
+Installs Build Tools from the offline layout:
 
+```bash
+just install
+```
+
+This runs:
 ```bash
 wine .wine/drive_c/vslayout/vs_buildtools.exe \
     --quiet \
@@ -82,13 +101,27 @@ wine .wine/drive_c/vslayout/vs_buildtools.exe \
 ```
 
 **Key parameters:**
-- `--quiet`: No UI initialization
-- `--noweb`: Use only offline layout
-- `--norestart`: Don't reboot after install
+- `--quiet` - No UI initialization
+- `--noweb` - Use only offline layout (no internet downloads)
+- `--norestart` - Don't reboot after installation
+
+### Verification
+
+```bash
+# Run demo compilation
+just demo
+
+# Or manually verify
+wine cmd /c "cd visualstudio_buildtools\\2019 && confirm.bat"
+
+# Expected output:
+# ** Visual Studio 2019 Developer Command Prompt v16.11.51
+# [vcvarsall.bat] Environment initialized for: 'x64'
+```
 
 ## Usage
 
-After installation, activate the build environment:
+After installation, use the Build Tools:
 
 ```bash
 # Enter nix-shell
@@ -97,107 +130,173 @@ nix-shell
 # Load Visual Studio environment
 wine cmd /c "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" x64
 
-# Now you can use cl.exe, link.exe, etc.
-wine cl.exe --version
+# Compile C/C++ code
+wine cl.exe myfile.c
+wine cl.exe myfile.cpp
+
+# Check compiler version
+wine cl.exe
+```
+
+## Directory Structure
+
+```
+wine_msbuildtools/
+├── shell.nix                     # Nix environment with Wine
+├── justfile                      # Task runner with all commands
+├── visualstudio_buildtools/2019/
+│   ├── vs_buildtools.exe        # VS Build Tools bootstrapper
+│   └── confirm.bat              # Verification script
+└── .wine/                       # Wine prefix (created during install)
+    └── drive_c/
+        ├── vslayout/            # Offline installation layout (~5GB)
+        └── Program Files (x86)/
+            └── Microsoft Visual Studio/
+                └── 2019/BuildTools/  # Installed Build Tools
 ```
 
 ## Troubleshooting
 
-### Common Issues and Solutions
+### Common Issues
 
-#### 0. Missing .NET Framework 4.8 (CRITICAL)
+#### Issue #1: Missing .NET Framework 4.8
 
-**Problem:** VS Build Tools installer crashes with segmentation fault before any GUI appears.
+**Problem:** VS Build Tools installer crashes with segmentation fault before any output.
 
 **Error code:** Exit code 139 (SIGSEGV)
 
-**Root cause:** The VS installer bootstrapper requires .NET Framework 4.8 to initialize. Without it, the process crashes during early initialization.
+**Root cause:** The VS installer bootstrapper requires .NET Framework 4.8 to initialize.
 
-**Solution:** Install .NET Framework 4.8 via winetricks before running the installer:
+**Solution:**
 ```bash
+just prerequisites
+# Or manually:
 nix-shell --run "winetricks -q dotnet48"
 ```
 
-**Note:** This is automatically handled by `install_buildtools.sh`, but must be done manually if running the installer directly.
+#### Issue #2: WPF Graphics Error (0x88980406)
 
-#### 1. WPF Graphics Error (0x88980406)
+**Problem:** Installer exits with error code 0x138a, logs show WPF graphics errors.
 
-**Problem:** Visual Studio installer uses Windows Presentation Foundation (WPF) which requires DirectX capabilities Wine doesn't support.
+**Root cause:** Visual Studio installer uses Windows Presentation Foundation (WPF) which requires DirectX capabilities Wine doesn't fully support.
 
 **Solution:** Use `--quiet` flag instead of `--passive` to skip all UI initialization.
+```bash
+# ✗ Wrong - tries to show UI
+wine vs_buildtools.exe --passive ...
 
-#### 2. Environment Variable Case Conflict
-
-**Problem:** Wine exposes both `SHELL` (Linux) and `shell` (Windows), causing .NET dictionary conflicts.
-
-**Error message:**
-```
-Error: Item has already been added. Key in dictionary: 'shell'  Key being added: 'SHELL'
+# ✓ Correct - skips all UI
+wine vs_buildtools.exe --quiet ...
 ```
 
-**Solution:** Unset `SHELL` before running installer:
+**Why this works:**
+- `--passive`: Shows minimal UI, still initializes WPF
+- `--quiet`: No UI at all, skips WPF initialization
+
+#### Issue #3: Environment Variable Case Conflict
+
+**Problem:** Installer crashes with "Item has already been added. Key in dictionary: 'shell' Key being added: 'SHELL'"
+
+**Error code:** 0x80070057
+
+**Root cause:** Wine exposes both `SHELL` (Linux) and `shell` (Windows). The .NET installer's case-insensitive dictionary detects both as duplicates.
+
+**Solution:** Unset `SHELL` before running installer (automatically done by justfile):
 ```bash
 unset SHELL && wine vs_buildtools.exe ...
 ```
 
-#### 3. Layout Path Too Long (Error 0x138f / 5007)
+#### Issue #4: Layout Path Too Long (Error 0x138f / 5007)
 
-**Problem:** VS installer requires layout paths to be less than 80 characters.
+**Problem:** "The source layout directory is too long. The layout directory name must be less than 80 characters."
 
-**Error message:**
-```
-Error: The source layout directory is too long.
-The layout directory name must be less than 80 characters.
-```
+**Root cause:** VS installer has a hardcoded 80-character limit on layout paths.
 
-**Solution:** Use short path like `C:\vslayout` instead of long Wine Z:\ paths.
-
-#### 4. Relative Path Error (0x80070057)
-
-**Problem:** `--layout` flag doesn't support relative paths or Linux-style paths.
-
-**Error message:**
-```
-Error 0x80070057: --layout does not support relative paths.
-```
-
-**Solution:** Use Windows absolute path format:
+**Solution:** Use short Windows C:\ paths instead of long Wine Z:\ paths:
 ```bash
-# ✗ Wrong
+# ✗ Wrong - path too long
+wine vs_buildtools.exe --layout "Z:\home\user\very\long\path\..."
+
+# ✓ Correct - short path (<80 chars)
+wine vs_buildtools.exe --layout "C:\vslayout"
+```
+
+#### Issue #5: Relative Path Error (0x80070057)
+
+**Problem:** "--layout does not support relative paths"
+
+**Root cause:** The `--layout` parameter requires absolute Windows paths with drive letters.
+
+**Solution:** Always use Windows absolute paths:
+```bash
+# ✗ Wrong - relative path
 --layout "$(pwd)/offline_layout"
+
+# ✗ Wrong - Linux absolute path
 --layout "/home/user/layout"
 
-# ✓ Correct
+# ✓ Correct - Windows C: path
 --layout "C:\vslayout"
 ```
 
-#### 5. Invalid Command Line Argument
+#### Issue #6: Invalid `--wait` Parameter
 
-**Problem:** VS 2019 installer doesn't support `--wait` flag (it was removed in later versions).
+**Problem:** "Option 'wait' is unknown", exit code 87
 
-**Error message:**
-```
-Option 'wait' is unknown.
-Error 0x80070057 (exit code 87)
-```
+**Root cause:** The `--wait` flag was removed in VS 2019 installer.
 
-**Solution:** Remove `--wait` flag from command line.
-
-### Diagnostic Logs
-
-Installation logs are located in:
-```
-.wine/drive_c/users/mpedersen/Temp/
-├── dd_bootstrapper_*.log          # Bootstrapper execution logs
-├── dd_installer_*.log             # Main installer logs
-├── dd_installer_elevated_*.log    # Elevated installer logs
-├── dd_setup_*.log                 # Setup engine logs
-└── dd_vs_buildtools_decompression_log.txt  # Extraction logs
-```
-
-Check the most recent logs for detailed error information:
+**Solution:** Remove `--wait` from command line (justfile already does this):
 ```bash
-ls -ltr .wine/drive_c/users/mpedersen/Temp/dd_*.log | tail -5
+# ✗ Wrong - --wait not supported
+wine vs_buildtools.exe --quiet --wait ...
+
+# ✓ Correct - no --wait
+wine vs_buildtools.exe --quiet ...
+```
+
+### Diagnostic Commands
+
+```bash
+# Check installation status
+just status
+
+# View recent installer logs
+just check-logs
+
+# Manual log inspection
+ls -ltr .wine/drive_c/users/*/Temp/dd_*.log | tail -10
+cat .wine/drive_c/users/*/Temp/dd_bootstrapper_*.log | grep -i error
+
+# Check Wine processes
+just clean-wine
+
+# Check disk usage
+du -sh .wine/drive_c/vslayout/
+du -sh ".wine/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/"
+
+# Verify key files
+ls -la ".wine/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Auxiliary/Build/vcvarsall.bat"
+```
+
+### Success Indicators
+
+**Successful layout download:**
+```bash
+# Log shows:
+Launched extracted application exiting with result code: 0x0
+
+# Verification:
+du -sh .wine/drive_c/vslayout/  # ~4.9G
+ls .wine/drive_c/vslayout/Catalog.json  # Should exist
+```
+
+**Successful installation:**
+```bash
+# Log shows:
+Exit Code: 0
+
+# Verification:
+just demo  # Should compile and run test program
 ```
 
 ## Technical Details
@@ -208,7 +307,8 @@ The `shell.nix` provides:
 - Wine 9.0 (wineWow64Packages.full) with 64-bit support
 - winetricks for managing Windows components
 - wine64 symlink fix for winetricks compatibility
-- Isolated Wine prefix at `.wine/` (not system-wide)
+- Isolated Wine prefix at `./.wine/` (not system-wide)
+- `just` task runner for convenient commands
 
 ### Critical Fixes Applied
 
@@ -217,47 +317,38 @@ The `shell.nix` provides:
 3. **Path Format:** Using Windows C:\ paths instead of Wine Z:\ paths
 4. **Path Length:** Keeping paths under 80 characters
 5. **Offline Mode:** Using `--noweb` to prevent network hangs
+6. **.NET Framework:** Installing .NET 4.8 before running VS installer
 
-### Prerequisites Installed
+### Components Installed
 
-The installation includes:
-- .NET Framework 4.0 through 4.8
-- Visual C++ runtimes
-- Windows SDK 10.0.19041
-- MSBuild tools
-- C/C++ compiler toolchain (cl.exe, link.exe)
-- CMake tools
-- LLVM/Clang toolsets
+**Main workload:**
+- Microsoft.VisualStudio.Workload.VCTools
 
-### What Gets Installed
-
-**Components included:**
-- Microsoft.VisualStudio.Workload.VCTools (main workload)
+**Key components:**
 - Microsoft.VisualStudio.Component.VC.Tools.x86.x64
-- Microsoft.VisualStudio.Component.VC.Redist.14.Latest
 - Microsoft.VisualStudio.Component.Windows10SDK.19041
 - Microsoft.VisualStudio.Component.VC.CMake.Project
 - Microsoft.VisualStudio.Component.VC.ATL
 - Microsoft.VisualStudio.Component.VC.ATLMFC
-- Microsoft.VisualStudio.Component.VC.CLI.Support
 - Microsoft.VisualStudio.ComponentGroup.NativeDesktop.Llvm.Clang
-- And many more...
+- And many more with `--includeRecommended --includeOptional`
 
 **Installation size:**
 - Offline layout: ~5GB
 - Installed Build Tools: ~3-4GB
 - Total disk usage: ~8-10GB
 
-## Known Limitations
-
 ### What Works
+
 ✅ Offline layout creation
 ✅ Build Tools installation
 ✅ vcvarsall.bat environment setup
 ✅ Command-line compilation (cl.exe, link.exe)
 ✅ MSBuild execution
+✅ CMake with MSVC
 
-### What May Not Work
+### Known Limitations
+
 ⚠️ GUI applications (due to WPF limitations)
 ⚠️ Interactive installers
 ⚠️ Some Windows-specific services
@@ -278,9 +369,10 @@ However, for production use or if you encounter issues, consider:
 ## Version Information
 
 - **Visual Studio Build Tools:** 2019 (16.11.51)
+- **MSVC Compiler:** 19.29.30159
+- **MSVC Linker:** 14.29.30159
 - **Wine:** 9.0 (wineWow64Packages.full)
 - **Architecture:** win64 (64-bit)
-- **Installer Version:** 3.14.2086
 
 ## References
 
@@ -294,28 +386,8 @@ However, for production use or if you encounter issues, consider:
 - [Wine User's Guide](https://wiki.winehq.org/Wine_User%27s_Guide)
 - [winetricks](https://github.com/Winetricks/winetricks)
 
-## Verification
-
-To verify the installation is working:
-
-```bash
-# Enter the environment
-nix-shell
-
-# Run the confirmation script
-wine cmd /c "cd visualstudio_buildtools\\2019 && confirm.bat"
-
-# Expected output:
-# ** Visual Studio 2019 Developer Command Prompt v16.11.51
-# ** Copyright (c) 2021 Microsoft Corporation
-# [vcvarsall.bat] Environment initialized for: 'x64'
-
-# Check for vcvarsall.bat
-ls -la ".wine/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Auxiliary/Build/vcvarsall.bat"
-```
-
 ## License
 
 This project uses Microsoft Visual Studio Build Tools 2019, which is subject to Microsoft's license terms. Please review the license agreement before use.
 
-The installation scripts (shell.nix, install_buildtools.sh) are provided as-is for educational and development purposes.
+The installation scripts (shell.nix, justfile) are provided as-is for educational and development purposes.
