@@ -125,8 +125,8 @@ download-minimal:
     # Download the offline layout - MINIMAL (no --includeRecommended/Optional)
     echo "Downloading MINIMAL offline layout (core C++ tools only, smaller size)..."
     unset SHELL
-    # Override WINEDEBUG to show errors and warnings
-    WINEDEBUG="warn+all,err+all,fixme-all" wine "{{vs_buildtools_exe}}" \
+    # Reduce Wine debug noise (only show errors)
+    WINEDEBUG="err+all" wine "{{vs_buildtools_exe}}" \
         --layout "{{layout_path}}" \
         --lang en-US \
         --add Microsoft.VisualStudio.Workload.VCTools \
@@ -274,12 +274,11 @@ install-minimal:
 
     # Install from offline layout - MINIMAL (no --includeRecommended/Optional)
     echo "Installing MINIMAL Build Tools from offline layout (core C++ tools only)..."
-    echo "Enabling Wine error output to diagnose issues..."
 
     unset SHELL
     set +e  # Don't exit on error, we want to check exit code
-    # Override WINEDEBUG to show errors and warnings (shell.nix sets it to -all)
-    WINEDEBUG="warn+all,err+all,fixme-all" wine "{{wineprefix}}/drive_c/vslayout/vs_buildtools.exe" \
+    # Reduce Wine debug noise (only show errors)
+    WINEDEBUG="err+all" wine "{{wineprefix}}/drive_c/vslayout/vs_buildtools.exe" \
         --quiet \
         --norestart \
         --noweb \
@@ -306,9 +305,15 @@ install-minimal:
     # Verify installation
     vcvarsall="{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Auxiliary/Build/vcvarsall.bat"
     if [ ! -f "$vcvarsall" ]; then
-        echo "ERROR: Installation verification failed: vcvarsall.bat not found" >&2
-        echo "Checking what was installed..."
-        ls -la "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/" 2>/dev/null || echo "No BuildTools directory found"
+        echo "ERROR: Installation verification failed: vcvarsall.bat not found at expected location" >&2
+        echo "Searching for vcvarsall.bat in BuildTools directory..."
+        find "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools" -name "vcvarsall.bat" 2>/dev/null || echo "Not found in BuildTools"
+        echo ""
+        echo "Checking BuildTools directory structure..."
+        ls -la "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools" 2>/dev/null || echo "No BuildTools directory found"
+        echo ""
+        echo "Checking VC directory..."
+        ls -la "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC" 2>/dev/null || echo "No VC directory found"
         echo ""
         echo "Checking recent logs..."
         ls -ltr "{{wineprefix}}/drive_c/users/"*/Temp/dd_*.log 2>/dev/null | tail -5 || echo "No logs found"
