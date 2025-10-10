@@ -73,6 +73,10 @@ download:
         --includeOptional \
         --quiet
 
+    # Wait for all Wine processes to complete
+    echo "Waiting for download to complete..."
+    wineserver --wait
+
     if [ ! -d "{{wineprefix}}/drive_c/vslayout" ]; then
         echo "ERROR: Layout directory was not created" >&2
         exit 1
@@ -127,10 +131,22 @@ install:
         --includeRecommended \
         --includeOptional
 
+    # Wait for all Wine processes to complete (installer spawns background processes)
+    echo "Waiting for installer to complete..."
+    wineserver --wait
+
+    # Give filesystem time to sync (especially important in CI)
+    sleep 5
+
     # Verify installation
     vcvarsall="{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Auxiliary/Build/vcvarsall.bat"
     if [ ! -f "$vcvarsall" ]; then
         echo "ERROR: Installation verification failed: vcvarsall.bat not found" >&2
+        echo "Checking what was installed..."
+        ls -la "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/" 2>/dev/null || echo "No BuildTools directory found"
+        echo ""
+        echo "Checking recent logs..."
+        ls -ltr "{{wineprefix}}/drive_c/users/"*/Temp/dd_*.log 2>/dev/null | tail -5 || echo "No logs found"
         exit 1
     fi
 
