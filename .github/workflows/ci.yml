@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  NIX_PATH: "nixpkgs=channel:nixos-24.05"
+
+jobs:
+  validate-environment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v25
+      - name: Load Nix shell
+        run: nix-shell --pure --run "echo 'Nix shell loaded successfully'"
+      - name: Verify Wine is available
+        run: nix-shell --pure --run "wine --version"
+      - name: Verify just is available
+        run: nix-shell --pure --run "just --version"
+      - name: Verify winetricks is available
+        run: nix-shell --pure --run "winetricks --version"
+
+  validate-justfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v25
+      - name: List available just commands
+        run: nix-shell --pure --run "just --list"
+      - name: Show justfile summary
+        run: nix-shell --pure --run "just --summary"
+      - name: Validate justfile syntax
+        run: nix-shell --pure --run "just --evaluate"
+
+  validate-documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check README exists
+        run: test -f README.md
+      - name: Check README has Quick Start section
+        run: grep -q "## Quick Start" README.md
+      - name: Check README has Troubleshooting section
+        run: grep -q "## Troubleshooting" README.md
+      - name: Check justfile exists
+        run: test -f justfile
+      - name: Check shell.nix exists
+        run: test -f shell.nix
+
+  check-prerequisites:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v25
+      - name: Initialize Wine prefix (dry run)
+        run: |
+          nix-shell --pure --run "wineboot --help"
+      - name: Show Wine environment info
+        run: |
+          nix-shell --pure --run "just info" || echo "Wine prefix not initialized (expected in CI)"
+      - name: Verify VS Build Tools bootstrapper exists
+        run: test -f visualstudio_buildtools/2019/vs_buildtools.exe
+      - name: Verify confirmation script exists
+        run: test -f visualstudio_buildtools/2019/confirm.bat
+
+  lint-shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell.nix syntax
+        run: |
+          if command -v nix-instantiate &> /dev/null; then
+            nix-instantiate --parse shell.nix > /dev/null
+          else
+            echo "nix-instantiate not available, skipping syntax check"
+          fi
