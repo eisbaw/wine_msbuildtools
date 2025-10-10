@@ -65,7 +65,8 @@ download:
     # Download the offline layout
     echo "Downloading offline layout (this will take 10-30 minutes and download ~5GB)..."
     unset SHELL
-    wine "{{vs_buildtools_exe}}" \
+    # Override WINEDEBUG to show errors and warnings
+    WINEDEBUG="warn+all,err+all,fixme-all" wine "{{vs_buildtools_exe}}" \
         --layout "{{layout_path}}" \
         --lang en-US \
         --add Microsoft.VisualStudio.Workload.VCTools \
@@ -122,9 +123,12 @@ install:
 
     # Install from offline layout
     echo "Installing Build Tools from offline layout..."
+    echo "Enabling Wine error output to diagnose issues..."
+
     unset SHELL
     set +e  # Don't exit on error, we want to check exit code
-    wine "{{wineprefix}}/drive_c/vslayout/vs_buildtools.exe" \
+    # Override WINEDEBUG to show errors and warnings (shell.nix sets it to -all)
+    WINEDEBUG="warn+all,err+all,fixme-all" wine "{{wineprefix}}/drive_c/vslayout/vs_buildtools.exe" \
         --quiet \
         --norestart \
         --noweb \
