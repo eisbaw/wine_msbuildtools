@@ -81,17 +81,12 @@ jobs:
   full-installation-test:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      # Use /dev/shm (RAM disk) for Wine prefix to save disk space
+      WINEPREFIX: /dev/shm/.wine
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v25
-
-      - name: Cache Wine prefix
-        uses: actions/cache@v4
-        with:
-          path: .wine
-          key: wine-prefix-${{ runner.os }}-${{ hashFiles('justfile', 'shell.nix') }}
-          restore-keys: |
-            wine-prefix-${{ runner.os }}-
 
       - name: Cache winetricks downloads
         uses: actions/cache@v4
@@ -105,12 +100,12 @@ jobs:
         run: xvfb-run -a nix-shell --run "just prerequisites"
         timeout-minutes: 20
 
-      - name: Download offline layout (~5GB)
-        run: xvfb-run -a nix-shell --run "just download"
-        timeout-minutes: 45
+      - name: Download offline layout - MINIMAL (core tools only)
+        run: xvfb-run -a nix-shell --run "just download-minimal"
+        timeout-minutes: 30
 
-      - name: Install Build Tools
-        run: xvfb-run -a nix-shell --run "just install"
+      - name: Install Build Tools - MINIMAL (uses less disk space)
+        run: xvfb-run -a nix-shell --run "just install-minimal"
         timeout-minutes: 30
 
       - name: Run demo compilation

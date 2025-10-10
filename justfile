@@ -86,6 +86,64 @@ download:
     layout_size=$(du -sh "{{wineprefix}}/drive_c/vslayout" | cut -f1)
     echo "Offline layout downloaded successfully (size: $layout_size)"
 
+# Download VS Build Tools offline layout - MINIMAL (core tools only, less disk space)
+download-minimal:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check prerequisites
+    if [ ! -f "{{vs_buildtools_exe}}" ]; then
+        echo "ERROR: vs_buildtools.exe not found. Please ensure visualstudio_buildtools/2019/ directory exists." >&2
+        exit 1
+    fi
+
+    # Initialize Wine if needed
+    if [ ! -d "{{wineprefix}}" ]; then
+        echo "Initializing Wine prefix..."
+        wineboot --init
+        wineserver --wait
+    fi
+
+    # Ensure .NET Framework 4.8 is installed
+    if [ ! -f "{{wineprefix}}/dosdevices/c:/windows/dotnet48.installed.workaround" ]; then
+        echo "ERROR: .NET Framework 4.8 not installed. Run 'just prerequisites' first." >&2
+        exit 1
+    fi
+
+    # Check if layout already exists
+    if [ -d "{{wineprefix}}/drive_c/vslayout" ]; then
+        echo "Offline layout already exists"
+        read -p "Re-download? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Skipping download"
+            exit 0
+        fi
+        rm -rf "{{wineprefix}}/drive_c/vslayout"
+    fi
+
+    # Download the offline layout - MINIMAL (no --includeRecommended/Optional)
+    echo "Downloading MINIMAL offline layout (core C++ tools only, smaller size)..."
+    unset SHELL
+    # Override WINEDEBUG to show errors and warnings
+    WINEDEBUG="warn+all,err+all,fixme-all" wine "{{vs_buildtools_exe}}" \
+        --layout "{{layout_path}}" \
+        --lang en-US \
+        --add Microsoft.VisualStudio.Workload.VCTools \
+        --quiet
+
+    # Wait for all Wine processes to complete
+    echo "Waiting for download to complete..."
+    wineserver --wait
+
+    if [ ! -d "{{wineprefix}}/drive_c/vslayout" ]; then
+        echo "ERROR: Layout directory was not created" >&2
+        exit 1
+    fi
+
+    layout_size=$(du -sh "{{wineprefix}}/drive_c/vslayout" | cut -f1)
+    echo "Minimal offline layout downloaded successfully (size: $layout_size)"
+
 # Install Build Tools (downloads layout if needed, then installs)
 install:
     #!/usr/bin/env bash
@@ -172,6 +230,97 @@ install:
     echo ""
     echo "================================================================"
     echo "Installation completed successfully!"
+    echo "================================================================"
+    echo ""
+    echo "Build Tools location:"
+    echo "  {{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/"
+    echo ""
+    echo "To verify, run: just demo"
+
+# Install Build Tools - MINIMAL (core tools only, less disk space)
+install-minimal:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check prerequisites
+    if [ ! -f "{{vs_buildtools_exe}}" ]; then
+        echo "ERROR: vs_buildtools.exe not found" >&2
+        exit 1
+    fi
+
+    # Initialize Wine if needed
+    if [ ! -d "{{wineprefix}}" ]; then
+        echo "Initializing Wine prefix..."
+        wineboot --init
+        wineserver --wait
+    fi
+
+    # Download layout if it doesn't exist
+    if [ ! -d "{{wineprefix}}/drive_c/vslayout" ]; then
+        echo "Offline layout not found. Running minimal download first..."
+        just download-minimal
+    fi
+
+    # Check if already installed
+    if [ -f "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Auxiliary/Build/vcvarsall.bat" ]; then
+        echo "Build Tools already installed"
+        read -p "Reinstall? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Skipping installation"
+            exit 0
+        fi
+    fi
+
+    # Install from offline layout - MINIMAL (no --includeRecommended/Optional)
+    echo "Installing MINIMAL Build Tools from offline layout (core C++ tools only)..."
+    echo "Enabling Wine error output to diagnose issues..."
+
+    unset SHELL
+    set +e  # Don't exit on error, we want to check exit code
+    # Override WINEDEBUG to show errors and warnings (shell.nix sets it to -all)
+    WINEDEBUG="warn+all,err+all,fixme-all" wine "{{wineprefix}}/drive_c/vslayout/vs_buildtools.exe" \
+        --quiet \
+        --norestart \
+        --noweb \
+        --add Microsoft.VisualStudio.Workload.VCTools
+    installer_exit_code=$?
+    set -e
+
+    # Wait for all Wine processes to complete (installer spawns background processes)
+    echo "Waiting for installer to complete..."
+    wineserver --wait
+
+    # Give filesystem time to sync (especially important in CI)
+    sleep 5
+
+    # Check installer exit code
+    echo "Installer exit code: $installer_exit_code"
+    if [ $installer_exit_code -ne 0 ]; then
+        echo "WARNING: Installer returned non-zero exit code: $installer_exit_code"
+        echo "Checking logs for errors..."
+        tail -100 "{{wineprefix}}/drive_c/users/"*/Temp/dd_setup_*.log 2>/dev/null | grep -i "error" || true
+        tail -100 "{{wineprefix}}/drive_c/users/"*/Temp/dd_installer_*.log 2>/dev/null | grep -i "error" || true
+    fi
+
+    # Verify installation
+    vcvarsall="{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Auxiliary/Build/vcvarsall.bat"
+    if [ ! -f "$vcvarsall" ]; then
+        echo "ERROR: Installation verification failed: vcvarsall.bat not found" >&2
+        echo "Checking what was installed..."
+        ls -la "{{wineprefix}}/drive_c/Program Files (x86)/Microsoft Visual Studio/2019/" 2>/dev/null || echo "No BuildTools directory found"
+        echo ""
+        echo "Checking recent logs..."
+        ls -ltr "{{wineprefix}}/drive_c/users/"*/Temp/dd_*.log 2>/dev/null | tail -5 || echo "No logs found"
+        exit 1
+    fi
+
+    # Cleanup
+    wineserver -k 2>/dev/null || true
+
+    echo ""
+    echo "================================================================"
+    echo "MINIMAL installation completed successfully!"
     echo "================================================================"
     echo ""
     echo "Build Tools location:"
