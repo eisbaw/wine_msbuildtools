@@ -35,6 +35,17 @@ packages/
 
 ## Installation Process
 
+### Prerequisites: .NET Framework 4.8
+
+**CRITICAL:** The VS Build Tools installer requires .NET Framework 4.8 to be installed in Wine before it will run. Without it, the installer will crash with a segmentation fault (exit code 139).
+
+Install via winetricks:
+```bash
+nix-shell --run "winetricks -q dotnet48"
+```
+
+This is automatically handled by the `install_buildtools.sh` script.
+
 ### Stage 1: Download Offline Layout
 
 The installer downloads a complete offline installation layout containing all required packages:
@@ -93,6 +104,21 @@ wine cl.exe --version
 ## Troubleshooting
 
 ### Common Issues and Solutions
+
+#### 0. Missing .NET Framework 4.8 (CRITICAL)
+
+**Problem:** VS Build Tools installer crashes with segmentation fault before any GUI appears.
+
+**Error code:** Exit code 139 (SIGSEGV)
+
+**Root cause:** The VS installer bootstrapper requires .NET Framework 4.8 to initialize. Without it, the process crashes during early initialization.
+
+**Solution:** Install .NET Framework 4.8 via winetricks before running the installer:
+```bash
+nix-shell --run "winetricks -q dotnet48"
+```
+
+**Note:** This is automatically handled by `install_buildtools.sh`, but must be done manually if running the installer directly.
 
 #### 1. WPF Graphics Error (0x88980406)
 

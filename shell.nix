@@ -16,6 +16,9 @@ pkgs.mkShell {
     # Useful for debugging
     file
     which
+
+    # Task runner
+    just
   ];
 
   # Set up environment variables for local wineprefix
@@ -38,36 +41,10 @@ pkgs.mkShell {
 
     # Initialize wineprefix if it doesn't exist
     if [ ! -d "$WINEPREFIX" ]; then
-      echo "Initializing 64-bit WINE prefix at $WINEPREFIX..."
       wineboot --init
-
-      # Wait for wineserver to finish initialization
       wineserver --wait
-
-      echo "WINE prefix initialized successfully."
     fi
 
-    # Helper functions
-    install_buildtools() {
-      echo "Starting Microsoft Build Tools 2019 installation..."
-      wine visualstudio_buildtools/2019/vs_buildtools.exe
-    }
-
-    run_confirm() {
-      echo "Running confirmation script..."
-      wine cmd /c "cd visualstudio_buildtools\\2019 && confirm.bat"
-    }
-
-    # Show available commands
-    echo ""
-    echo "Environment ready. Available commands:"
-    echo "  install_buildtools - Install Microsoft Build Tools 2019"
-    echo "  run_confirm       - Run the confirmation script"
-    echo "  winecfg          - Open Wine configuration"
-    echo "  winetricks       - Run winetricks for additional Windows components"
-    echo ""
-    echo "Wine prefix location: $WINEPREFIX"
-    echo "Wine architecture: $WINEARCH"
-    echo "wine64 symlink: $(which wine64)"
+    echo "Wine Build Tools environment ready. Run 'just' to see available commands."
   '';
 }
