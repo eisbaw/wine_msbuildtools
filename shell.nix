@@ -19,6 +19,9 @@ pkgs.mkShell {
 
     # Task runner
     just
+
+    # Virtual X server for headless GUI apps
+    xorg.xvfb
   ];
 
   # Set up environment variables for local wineprefix

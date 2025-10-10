@@ -102,15 +102,15 @@ jobs:
             winetricks-cache-${{ runner.os }}-
 
       - name: Install prerequisites (.NET Framework 4.8)
-        run: nix-shell --run "just prerequisites"
+        run: xvfb-run -a nix-shell --run "just prerequisites"
         timeout-minutes: 20
 
       - name: Download offline layout (~5GB)
-        run: nix-shell --run "just download"
+        run: xvfb-run -a nix-shell --run "just download"
         timeout-minutes: 45
 
       - name: Install Build Tools
-        run: nix-shell --run "just install"
+        run: xvfb-run -a nix-shell --run "just install"
         timeout-minutes: 30
 
       - name: Run demo compilation
