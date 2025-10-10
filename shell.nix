@@ -21,7 +21,8 @@ pkgs.mkShell {
     just
 
     # Virtual X server for headless GUI apps
-    xorg.xvfb
+    xvfb-run
+    xorg.xorgserver  # Provides Xvfb binary
   ];
 
   # Set up environment variables for local wineprefix
